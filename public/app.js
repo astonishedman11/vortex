@@ -7,6 +7,9 @@ const ICE_SERVERS = [
 
 // Use location.hostname so it works both when opened by IP or localhost (adb reverse -> localhost)
 const socket = io();
+const socket = io("/", {
+  transports: ["websocket"], 
+});
 
 
 const myIdEl = document.getElementById("myId");
@@ -174,5 +177,6 @@ hangupBtn.onclick = () => {
   ringtone.pause(); ringtone.currentTime = 0;
   log("Call ended");
 };
+
 
 

@@ -1,60 +1,36 @@
-// server.js — signaling server for Railway (Express + ws)
 const express = require("express");
-const http = require("http");
-const WebSocket = require("ws");
 const path = require("path");
-
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
-app.use(express.static(path.join(__dirname, "public")));
+const server = require("http").createServer(app);
+const io = require("socket.io")(server, {
+  cors: {
+    origin: "*"
+  }
+});
 
-const clients = new Map();
+app.use(express.static(path.join(__dirname)));
 
-function genId() {
-  return Math.random().toString(36).substr(2, 9);
-}
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
 
-wss.on("connection", (ws) => {
-  const id = genId();
-  clients.set(id, ws);
-  console.log("Client connected:", id);
+  // отправляем ID клиенту
+  socket.emit("your-id", socket.id);
 
-  ws.send(JSON.stringify({ type: "id", id }));
-
-  ws.on("message", (raw) => {
-    let msg;
-    try {
-      msg = JSON.parse(raw);
-    } catch (e) {
-      console.log("Bad JSON from", id);
-      return;
-    }
-
-    if (msg.to) {
-      const target = clients.get(String(msg.to));
-      if (target && target.readyState === WebSocket.OPEN) {
-        target.send(JSON.stringify({ ...msg, from: id }));
-      } else {
-        ws.send(JSON.stringify({ type: "error", message: "target-not-found", to: msg.to }));
-      }
-    } else {
-      for (const [cid, cws] of clients.entries()) {
-        if (cid !== id && cws.readyState === WebSocket.OPEN) {
-          cws.send(JSON.stringify({ ...msg, from: id }));
-        }
-      }
-    }
+  socket.on("call-user", (data) => {
+    io.to(data.to).emit("call-made", {
+      offer: data.offer,
+      socket: socket.id
+    });
   });
 
-  ws.on("close", () => clients.delete(id));
-  ws.on("error", () => clients.delete(id));
+  socket.on("make-answer", (data) => {
+    io.to(data.to).emit("answer-made", {
+      answer: data.answer,
+      socket: socket.id
+    });
+  });
 });
 
-// Railway automatically gives process.env.PORT
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-  console.log("🚀 Server running on port", PORT);
-});
+server.listen(PORT, () => console.log("Server running on", PORT));

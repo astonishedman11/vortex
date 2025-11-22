@@ -1,27 +1,12 @@
-// app.js — WebRTC + Socket.IO (исправленная версия)
+const socket = io(); // socket.io клиент
 
-// ICE
-const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  {
-    urls: "turn:global.turn.twilio.com:3478?transport=udp",
-    username: "demo",
-    credential: "demo",
-  }
-];
-
-// Socket.IO клиент
-const socket = io("/", {
-  transports: ["websocket"], // важно для Railway
-});
-
-// DOM
 const myIdEl = document.getElementById("myId");
 const targetInput = document.getElementById("targetId");
 const callBtn = document.getElementById("callBtn");
 const answerBtn = document.getElementById("answerBtn");
 const hangupBtn = document.getElementById("hangupBtn");
 const logEl = document.getElementById("log");
+
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 const ringtone = document.getElementById("ringtone");
@@ -32,175 +17,144 @@ let localStream = null;
 let currentTarget = null;
 let incomingOffer = null;
 
-function log(...args) {
-  const line = `[${new Date().toLocaleTimeString()}] ${args.join(" ")}`;
-  logEl.textContent = line + "\n" + logEl.textContent;
-  console.log(...args);
+function log(msg) {
+  logEl.textContent = msg + "\n" + logEl.textContent;
+  console.log(msg);
 }
 
-// SOCKET.IO events
-socket.on("connect", () => log("Socket connected:", socket.id));
-socket.on("disconnect", () => log("Socket disconnected"));
-socket.on("connect_error", (e) => log("Socket error:", e));
+// ---------- SOCKET EVENTS ----------
 
-// Входящие сообщения
-socket.on("message", async (msg) => {
-  log("Message:", msg.type || msg);
-
-  // получить свой ID
-  if (msg.type === "id") {
-    myId = String(msg.id);
-    myIdEl.textContent = myId;
-    return;
-  }
-
-  // входящий offer
-  if (msg.type === "offer" && String(msg.target) === myId) {
-    currentTarget = String(msg.from);
-    incomingOffer = msg.offer;
-    log("Входящий вызов от", currentTarget);
-
-    ringtone.currentTime = 0;
-    ringtone.play().catch(() => {});
-    return;
-  }
-
-  // входящий answer
-  if (msg.type === "answer" && String(msg.target) === myId) {
-    if (!pc) return log("Нет pc для answer");
-    await pc.setRemoteDescription(msg.answer);
-    log("Answer установлен");
-    ringtone.pause(); ringtone.currentTime = 0;
-    return;
-  }
-
-  // ICE
-  if (msg.type === "candidate" && String(msg.target) === myId) {
-    if (pc && msg.candidate) {
-      await pc.addIceCandidate(msg.candidate).catch(err => log("ICE error:", err));
-      log("ICE добавлен");
-    }
-  }
-
-  if (msg.type === "error") log("Server error:", msg.message);
+// получаем свой ID
+socket.on("your-id", id => {
+  myId = id;
+  myIdEl.textContent = id;
+  log("Ваш ID: " + id);
 });
 
-// Получить камеру/мик
+// входящий вызов
+socket.on("call-made", async data => {
+  incomingOffer = data.offer;
+  currentTarget = data.socket;
+
+  log("Входящий вызов от " + currentTarget);
+
+  ringtone.currentTime = 0;
+  ringtone.play().catch(() => {});
+});
+
+// ответ собеседника
+socket.on("answer-made", async data => {
+  if (!pc) return log("Нет peerConnection при answer");
+
+  await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+  log("Answer установлен");
+
+  ringtone.pause();
+  ringtone.currentTime = 0;
+});
+
+// ---------- WEBRTC ----------
+
 async function ensureLocalStream() {
   if (localStream) return localStream;
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
-    localVideo.srcObject = localStream;
-    return localStream;
-  } catch (e) {
-    alert("Разреши доступ к камере/микрофону");
-    throw e;
-  }
+
+  localStream = await navigator.mediaDevices.getUserMedia({
+    video: true,
+    audio: true
+  });
+
+  localVideo.srcObject = localStream;
+  return localStream;
 }
 
-// WebRTC PeerConnection
 function createPeerConnection() {
-  const pcLocal = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const pcLocal = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }
+    ]
+  });
 
-  pcLocal.onicecandidate = (e) => {
+  pcLocal.onicecandidate = e => {
     if (e.candidate && currentTarget) {
-      socket.emit("message", {
-        type: "candidate",
+      socket.emit("ice-candidate", {
         candidate: e.candidate,
-        to: currentTarget,
-        target: currentTarget,
-        from: myId
+        to: currentTarget
       });
-      log("Отправлен ICE");
     }
   };
 
-  pcLocal.ontrack = (e) => {
+  pcLocal.ontrack = e => {
     remoteVideo.srcObject = e.streams[0];
-    log("Пришёл remote track");
-  };
-
-  pcLocal.onconnectionstatechange = () => {
-    log("PC state:", pcLocal.connectionState);
+    log("Получен remote track");
   };
 
   return pcLocal;
 }
 
-// call
+// ---------- BUTTONS ----------
+
+// CALL
 callBtn.onclick = async () => {
-  const target = targetInput.value.trim();
-  if (!target) return alert("Введите ID собеседника");
+  const id = targetInput.value.trim();
+  if (!id) return alert("Введите ID");
 
-  currentTarget = target;
+  currentTarget = id;
 
-  try {
-    await ensureLocalStream();
-    pc = createPeerConnection();
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  await ensureLocalStream();
+  pc = createPeerConnection();
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-    socket.emit("message", {
-      type: "offer",
-      offer,
-      to: currentTarget,
-      target: currentTarget,
-      from: myId
-    });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
 
-    log("Offer отправлен:", currentTarget);
-    ringtone.currentTime = 0;
-    ringtone.play().catch(() => {});
-  } catch (e) {
-    log("Call error:", e);
-  }
+  socket.emit("call-user", {
+    offer,
+    to: id
+  });
+
+  log("Offer отправлен: " + id);
+
+  ringtone.currentTime = 0;
+  ringtone.play().catch(() => {});
 };
 
-// accept
+// ANSWER
 answerBtn.onclick = async () => {
-  if (!incomingOffer) return alert("Нет входящего звонка");
+  if (!incomingOffer || !currentTarget) return;
 
-  ringtone.pause(); ringtone.currentTime = 0;
+  ringtone.pause();
+  ringtone.currentTime = 0;
 
-  try {
-    await ensureLocalStream();
-    pc = createPeerConnection();
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  await ensureLocalStream();
+  pc = createPeerConnection();
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-    await pc.setRemoteDescription(incomingOffer);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+  await pc.setRemoteDescription(new RTCSessionDescription(incomingOffer));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
 
-    socket.emit("message", {
-      type: "answer",
-      answer,
-      to: currentTarget,
-      target: currentTarget,
-      from: myId
-    });
+  socket.emit("make-answer", {
+    answer,
+    to: currentTarget
+  });
 
-    log("Answer отправлен");
-    incomingOffer = null;
-  } catch (e) {
-    log("Answer error:", e);
-  }
+  log("Answer отправлен");
+
+  incomingOffer = null;
 };
 
-// hangup
+// HANG UP
 hangupBtn.onclick = () => {
   if (pc) pc.close();
   pc = null;
-  currentTarget = null;
+
   incomingOffer = null;
+  currentTarget = null;
   remoteVideo.srcObject = null;
 
   ringtone.pause();
   ringtone.currentTime = 0;
 
-  log("Call ended");
+  log("Разговор завершён");
 };

@@ -8,7 +8,10 @@
 </head>
 <body>
   <div class="app">
-    <header><h1>Локальный видеозвонок</h1><p class="subtitle">ПК ↔ Телефон (ADB reverse)</p></header>
+    <header>
+      <h1>Локальный видеозвонок</h1>
+      <p class="subtitle">ПК ↔ Телефон (через интернет / Railway)</p>
+    </header>
 
     <section class="panel">
       <div class="row">
@@ -16,10 +19,10 @@
         <div class="small">Открой страницу на другом устройстве и введи ID</div>
       </div>
 
-      <input id="targetId" placeholder="ID собеседника (введите строку)" />
+      <input id="targetId" placeholder="ID собеседника" />
 
       <div class="controls">
-        <button id="callBtn" class="btn green">Позвонить</button>
+        <button id="callBtn"   class="btn green">Позвонить</button>
         <button id="answerBtn" class="btn teal">Принять</button>
         <button id="hangupBtn" class="btn red">Сбросить</button>
       </div>
@@ -41,7 +44,7 @@
     <audio id="ringtone" src="ring.mp3" loop></audio>
   </div>
 
-  <!-- 🔥 Важно: клиент socket.io -->
+  <!-- socket.io клиент -->
   <script src="/socket.io/socket.io.js"></script>
 
   <script src="app.js"></script>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Видеозвонок локально</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header><h1>Локальный видеозвонок</h1><p class="subtitle">ПК ↔ Телефон (ADB reverse)</p></header>
+
+    <section class="panel">
+      <div class="row">
+        <div>Ваш ID: <strong id="myId">получение...</strong></div>
+        <div class="small">Открой страницу на другом устройстве и введи ID</div>
+      </div>
+
+      <input id="targetId" placeholder="ID собеседника (введите строку)" />
+
+      <div class="controls">
+        <button id="callBtn" class="btn green">Позвонить</button>
+        <button id="answerBtn" class="btn teal">Принять</button>
+        <button id="hangupBtn" class="btn red">Сбросить</button>
+      </div>
+
+      <div class="log" id="log"></div>
+    </section>
+
+    <section class="videos">
+      <div class="video-box">
+        <h3>Вы</h3>
+        <video id="localVideo" autoplay muted playsinline></video>
+      </div>
+      <div class="video-box">
+        <h3>Собеседник</h3>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+    </section>
+
+    <audio id="ringtone" src="ring.mp3" loop></audio>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

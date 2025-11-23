@@ -31,6 +31,70 @@ let pendingCandidates = [];
 
 // ICE servers
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+// public/app.js — добавлена поддержка ГЛОБАЛЬНОГО режима (broadcast)
+// (оставшиеся части твоего app.js оставляем как есть; ниже — вставлять в начало/заменять соответствующие блоки)
+
+const globalChk = document.getElementById('globalChk'); // чекбокс, см. index.html добавление
+
+// --- действие отправки сообщения (обновлённый sendMessage) ---
+async function sendMessage() {
+  const text = msgInput.value.trim();
+  // если включен Global — отправляем всем (to = null)
+  const isGlobal = globalChk && globalChk.checked;
+  const to = isGlobal ? null : (targetInput.value.trim() || null);
+
+  if (!text) return;
+
+  const payload = { to, type: 'text', text, time: Date.now() };
+  socket.emit('chat-message', payload);
+  addMessageHTML(Object.assign({}, payload, { from: 'Вы' }));
+  msgInput.value = '';
+
+  // stop typing
+  socket.emit('stop-typing', { to });
+}
+
+// --- при отправке файла тоже учитывать Global ---
+fileInput.onchange = async (ev) => {
+  const file = ev.target.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/upload', { method: 'POST', body: fd });
+  const json = await res.json();
+  if (json && json.url) {
+    const isImage = file.type.startsWith('image/');
+    const isGlobal = globalChk && globalChk.checked;
+    const to = isGlobal ? null : (targetInput.value.trim() || null);
+
+    const payload = {
+      to,
+      type: isImage ? 'image' : 'file',
+      url: json.url,
+      name: json.name,
+      size: json.size,
+      mime: json.mime,
+      time: Date.now()
+    };
+    socket.emit('chat-message', payload);
+    addMessageHTML(Object.assign({}, payload, { from: 'Вы' }));
+  }
+  fileInput.value = '';
+};
+
+// --- typing indicator should also respect Global (optional) ---
+function handleTyping() {
+  if (!myId) return;
+  const isGlobal = globalChk && globalChk.checked;
+  const to = isGlobal ? null : (targetInput.value.trim() || null);
+  if (!isTyping) {
+    isTyping = true;
+    socket.emit('typing', { to });
+  }
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => {
+    isTyping = false;
+    socket.emit('stop-typing', { to });
+  }, 800);
+}
 
 // ----------------- helpers -----------------
 function addMessageHTML({ from, text, type, time, url, name, size, mime }) {
@@ -218,3 +282,4 @@ socket.on('call-made', (data) => {
 
 // expose for debugging
 window.pc = pc;
+

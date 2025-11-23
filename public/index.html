@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Vortex — видео + чат</title>
+  <title>Vortex — звонки (тел. ID) + чат</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Vortex — Видеозвонок + Чат</h1>
-      <div class="id-row">Ваш ID: <span id="myId">получение...</span></div>
+      <h1>Vortex — Звонки + Чат</h1>
+      <div class="id-row">Ваш номер: <span id="myId">получение...</span></div>
     </header>
 
     <main class="main-grid">
@@ -25,8 +25,9 @@
             <video id="remoteVideo" autoplay playsinline></video>
           </div>
         </div>
+
         <div class="call-controls">
-          <input id="targetId" placeholder="ID собеседника" />
+          <input id="targetId" placeholder="Введите номер собеседника (+7 ... )" />
           <button id="callBtn" class="btn">Позвонить</button>
           <button id="answerBtn" class="btn">Принять</button>
           <button id="hangupBtn" class="btn">Сбросить</button>
@@ -49,25 +50,17 @@
           <button id="sendMsgBtn" class="btn primary">Отправить</button>
         </div>
 
-        <div class="emoji-panel" id="emojiPanel" style="display:none">
-          <!-- simple emoji set -->
-          <button class="emoji">😀</button><button class="emoji">😂</button><button class="emoji">😍</button>
-          <button class="emoji">😎</button><button class="emoji">😢</button><button class="emoji">👍</button>
-          <button class="emoji">🔥</button><button class="emoji">🎉</button><button class="emoji">🙌</button>
-        </div>
+        <div id="emojiPanel" class="emoji-panel" style="display:none"></div>
 
         <div class="uploads-preview">
-          <h4>Превью загруженного файла (пример)</h4>
-          <!-- локальный путь пользователя, как попросил -->
-          <img src="/mnt/data/17b62eff-98c8-4fe7-81b5-e657d26e3f62.png" alt="uploaded" style="max-width:100%;border-radius:8px" />
+          <h4>Превью (пример локального файла)</h4>
+          <img src="/mnt/data/17b62eff-98c8-4fe7-81b5-e657d26e3f62.png" alt="preview" style="max-width:100%;border-radius:8px" />
         </div>
       </aside>
     </main>
   </div>
 
-  <!-- socket.io client -->
   <script src="/socket.io/socket.io.js"></script>
-  <!-- app -->
   <script src="app.js"></script>
 </body>
 </html>

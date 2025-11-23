@@ -3,50 +3,71 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Видеозвонок локально</title>
+  <title>Vortex — видео + чат</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
+  <div class="container">
     <header>
-      <h1>Локальный видеозвонок</h1>
-      <p class="subtitle">ПК ↔ Телефон (через интернет / Railway)</p>
+      <h1>Vortex — Видеозвонок + Чат</h1>
+      <div class="id-row">Ваш ID: <span id="myId">получение...</span></div>
     </header>
 
-    <section class="panel">
-      <div class="row">
-        <div>Ваш ID: <strong id="myId">получение...</strong></div>
-        <div class="small">Открой страницу на другом устройстве и введи ID</div>
-      </div>
+    <main class="main-grid">
+      <section class="video-area">
+        <div class="videos">
+          <div class="box">
+            <h4>Вы</h4>
+            <video id="localVideo" autoplay muted playsinline></video>
+          </div>
+          <div class="box">
+            <h4>Собеседник</h4>
+            <video id="remoteVideo" autoplay playsinline></video>
+          </div>
+        </div>
+        <div class="call-controls">
+          <input id="targetId" placeholder="ID собеседника" />
+          <button id="callBtn" class="btn">Позвонить</button>
+          <button id="answerBtn" class="btn">Принять</button>
+          <button id="hangupBtn" class="btn">Сбросить</button>
+        </div>
+      </section>
 
-      <input id="targetId" placeholder="ID собеседника" />
+      <aside class="chat-area">
+        <div class="chat-header">
+          <h3>Чат</h3>
+          <div id="typing" class="typing"></div>
+        </div>
 
-      <div class="controls">
-        <button id="callBtn"   class="btn green">Позвонить</button>
-        <button id="answerBtn" class="btn teal">Принять</button>
-        <button id="hangupBtn" class="btn red">Сбросить</button>
-      </div>
+        <div id="messages" class="messages"></div>
 
-      <div class="log" id="log"></div>
-    </section>
+        <div class="compose">
+          <button id="emojiBtn" class="emoji-btn">😊</button>
+          <input id="msgInput" placeholder="Написать сообщение..." autocomplete="off" />
+          <input id="fileInput" type="file" style="display:none" />
+          <button id="attachBtn" class="btn">📎</button>
+          <button id="sendMsgBtn" class="btn primary">Отправить</button>
+        </div>
 
-    <section class="videos">
-      <div class="video-box">
-        <h3>Вы</h3>
-        <video id="localVideo" autoplay muted playsinline></video>
-      </div>
-      <div class="video-box">
-        <h3>Собеседник</h3>
-        <video id="remoteVideo" autoplay playsinline></video>
-      </div>
-    </section>
+        <div class="emoji-panel" id="emojiPanel" style="display:none">
+          <!-- simple emoji set -->
+          <button class="emoji">😀</button><button class="emoji">😂</button><button class="emoji">😍</button>
+          <button class="emoji">😎</button><button class="emoji">😢</button><button class="emoji">👍</button>
+          <button class="emoji">🔥</button><button class="emoji">🎉</button><button class="emoji">🙌</button>
+        </div>
 
-    <audio id="ringtone" src="ring.mp3" loop></audio>
+        <div class="uploads-preview">
+          <h4>Превью загруженного файла (пример)</h4>
+          <!-- локальный путь пользователя, как попросил -->
+          <img src="/mnt/data/17b62eff-98c8-4fe7-81b5-e657d26e3f62.png" alt="uploaded" style="max-width:100%;border-radius:8px" />
+        </div>
+      </aside>
+    </main>
   </div>
 
-  <!-- socket.io клиент -->
+  <!-- socket.io client -->
   <script src="/socket.io/socket.io.js"></script>
-
+  <!-- app -->
   <script src="app.js"></script>
 </body>
 </html>

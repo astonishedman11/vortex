@@ -1,82 +1,75 @@
-// server.js
-const express = require('express');
-const http = require('http');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const multer = require('multer');
-const fs = require('fs');
-
+const express = require("express");
+const path = require("path");
 const app = express();
-const server = http.createServer(app);
-const io = require('socket.io')(server, { cors: { origin: '*' } });
 
-const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-// static
-app.use(express.static(path.join(__dirname, 'public')));
-
-// multer for uploads (file from form fetch)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const id = uuidv4();
-    const ext = path.extname(file.originalname);
-    cb(null, id + ext);
-  }
-});
-const upload = multer({ storage });
-
-// POST /upload — загружает файл и возвращает { url, name, size, type }
-app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'no-file' });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({
-    url,
-    name: req.file.originalname,
-    size: req.file.size,
-    type: req.file.mimetype
-  });
+const server = require("http").createServer(app);
+const io = require("socket.io")(server, {
+  cors: { origin: "*" }
 });
 
-// simple root
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.use(express.static(path.join(__dirname, "public")));
 
-// socket.io signaling + chat
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  // send id
-  socket.emit('your-id', socket.id);
+// ==========================
+//   ГЕНЕРАЦИЯ НОМЕРА
+// ==========================
+function generateKzPhone() {
+  const operators = ["700","701","702","705","707","708","747","771","775","776","777"];
+  const op = operators[Math.floor(Math.random() * operators.length)];
+  const num = String(Math.floor(1000000 + Math.random() * 9000000));
+  return `+7 ${op} ${num.slice(0,3)} ${num.slice(3)}`;
+}
 
-  // chat message: { to, type, text?, url?, name?, size?, mime? }
-  socket.on('chat-message', (data) => {
-    // if to specified — forward to single client, else broadcast to everyone (except sender)
-    if (data.to) {
-      io.to(data.to).emit('chat-message', Object.assign({}, data, { from: socket.id }));
-    } else {
-      socket.broadcast.emit('chat-message', Object.assign({}, data, { from: socket.id }));
-    }
+// phoneId → socketId
+const onlineUsers = {};
+
+io.on("connection", socket => {
+  const phoneId = generateKzPhone();
+  onlineUsers[phoneId] = socket.id;
+
+  socket.phoneId = phoneId;
+
+  console.log("📞 User connected:", phoneId);
+  socket.emit("your-id", phoneId);
+
+  // ВЫЗОВ
+  socket.on("call-user", data => {
+    const targetSocket = onlineUsers[data.to];
+    if (!targetSocket) return;
+
+    io.to(targetSocket).emit("call-made", {
+      offer: data.offer,
+      from: phoneId
+    });
   });
 
-  // typing indicator
-  socket.on('typing', (data) => {
-    if (data.to) io.to(data.to).emit('typing', { from: socket.id });
-    else socket.broadcast.emit('typing', { from: socket.id });
-  });
-  socket.on('stop-typing', (data) => {
-    if (data.to) io.to(data.to).emit('stop-typing', { from: socket.id });
-    else socket.broadcast.emit('stop-typing', { from: socket.id });
+  // ОТВЕТ
+  socket.on("make-answer", data => {
+    const targetSocket = onlineUsers[data.to];
+    if (!targetSocket) return;
+
+    io.to(targetSocket).emit("answer-made", {
+      answer: data.answer,
+      from: phoneId
+    });
   });
 
-  // relay for webrtc signalling (optional)
-  socket.on('call-user', (d) => { if (d.to) io.to(d.to).emit('call-made', { offer: d.offer, socket: socket.id }); });
-  socket.on('make-answer', (d) => { if (d.to) io.to(d.to).emit('answer-made', { answer: d.answer, socket: socket.id }); });
-  socket.on('ice-candidate', (d) => { if (d.to) io.to(d.to).emit('ice-candidate', { candidate: d.candidate, from: socket.id }); });
+  // ICE-кандидат
+  socket.on("ice-candidate", data => {
+    const targetSocket = onlineUsers[data.to];
+    if (!targetSocket) return;
 
-  socket.on('disconnect', () => console.log('User disconnected:', socket.id));
+    io.to(targetSocket).emit("ice-candidate", {
+      candidate: data.candidate,
+      from: phoneId
+    });
+  });
+
+  // ОТКЛЮЧЕН
+  socket.on("disconnect", () => {
+    delete onlineUsers[phoneId];
+    console.log("❌ User left:", phoneId);
+  });
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log('🚀 Server running on port', PORT));
+server.listen(PORT, () => console.log("🚀 Server running on port", PORT));

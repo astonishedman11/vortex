@@ -1,17 +1,35 @@
+// server.js — signaling + chat + uploads + phone-ID mapping
 const express = require("express");
+const http = require("http");
 const path = require("path");
+const fs = require("fs");
+const { v4: uuidv4 } = require("uuid");
+const multer = require("multer");
 const app = express();
+const server = http.createServer(app);
+const io = require("socket.io")(server, { cors: { origin: "*" } });
 
-const server = require("http").createServer(app);
-const io = require("socket.io")(server, {
-  cors: { origin: "*" }
+const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
+const upload = multer({ storage });
 
 app.use(express.static(path.join(__dirname, "public")));
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "no-file" });
+  res.json({
+    url: `/uploads/${req.file.filename}`,
+    name: req.file.originalname,
+    size: req.file.size,
+    mime: req.file.mimetype
+  });
+});
 
-// ==========================
-//   ГЕНЕРАЦИЯ НОМЕРА
-// ==========================
+// phone generation (Kazakhstan-style numbers); adjust if you want other format
 function generateKzPhone() {
   const operators = ["700","701","702","705","707","708","747","771","775","776","777"];
   const op = operators[Math.floor(Math.random() * operators.length)];
@@ -19,55 +37,62 @@ function generateKzPhone() {
   return `+7 ${op} ${num.slice(0,3)} ${num.slice(3)}`;
 }
 
-// phoneId → socketId
-const onlineUsers = {};
+// mapping phoneId -> socketId
+const online = {};
 
-io.on("connection", socket => {
+io.on("connection", (socket) => {
   const phoneId = generateKzPhone();
-  onlineUsers[phoneId] = socket.id;
-
   socket.phoneId = phoneId;
+  online[phoneId] = socket.id;
 
-  console.log("📞 User connected:", phoneId);
+  console.log("📞 Connected:", phoneId);
   socket.emit("your-id", phoneId);
 
-  // ВЫЗОВ
-  socket.on("call-user", data => {
-    const targetSocket = onlineUsers[data.to];
-    if (!targetSocket) return;
-
-    io.to(targetSocket).emit("call-made", {
-      offer: data.offer,
-      from: phoneId
-    });
+  // CHAT
+  // chat-message: { to?, type: 'text'|'image'|'file', text?, url?, name?, size?, mime?, time? }
+  socket.on("chat-message", (data) => {
+    const payload = Object.assign({}, data, { from: socket.phoneId });
+    if (data.to) {
+      const target = online[data.to];
+      if (target) io.to(target).emit("chat-message", payload);
+    } else {
+      socket.broadcast.emit("chat-message", payload);
+    }
   });
 
-  // ОТВЕТ
-  socket.on("make-answer", data => {
-    const targetSocket = onlineUsers[data.to];
-    if (!targetSocket) return;
-
-    io.to(targetSocket).emit("answer-made", {
-      answer: data.answer,
-      from: phoneId
-    });
+  socket.on("typing", (d) => {
+    if (d && d.to) {
+      const t = online[d.to]; if (t) io.to(t).emit("typing", { from: socket.phoneId });
+    } else socket.broadcast.emit("typing", { from: socket.phoneId });
+  });
+  socket.on("stop-typing", (d) => {
+    if (d && d.to) {
+      const t = online[d.to]; if (t) io.to(t).emit("stop-typing", { from: socket.phoneId });
+    } else socket.broadcast.emit("stop-typing", { from: socket.phoneId });
   });
 
-  // ICE-кандидат
-  socket.on("ice-candidate", data => {
-    const targetSocket = onlineUsers[data.to];
-    if (!targetSocket) return;
-
-    io.to(targetSocket).emit("ice-candidate", {
-      candidate: data.candidate,
-      from: phoneId
-    });
+  // WebRTC signaling via phoneId
+  socket.on("call-user", (d) => {
+    const target = online[d.to];
+    if (!target) return socket.emit("error", { message: "target-not-found" });
+    io.to(target).emit("call-made", { offer: d.offer, from: socket.phoneId });
   });
 
-  // ОТКЛЮЧЕН
+  socket.on("make-answer", (d) => {
+    const target = online[d.to];
+    if (!target) return;
+    io.to(target).emit("answer-made", { answer: d.answer, from: socket.phoneId });
+  });
+
+  socket.on("ice-candidate", (d) => {
+    const target = online[d.to];
+    if (!target) return;
+    io.to(target).emit("ice-candidate", { candidate: d.candidate, from: socket.phoneId });
+  });
+
   socket.on("disconnect", () => {
-    delete onlineUsers[phoneId];
-    console.log("❌ User left:", phoneId);
+    delete online[socket.phoneId];
+    console.log("❌ Disconnected:", socket.phoneId);
   });
 });
 

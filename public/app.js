@@ -34,24 +34,28 @@ const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 // public/app.js — добавлена поддержка ГЛОБАЛЬНОГО режима (broadcast)
 // (оставшиеся части твоего app.js оставляем как есть; ниже — вставлять в начало/заменять соответствующие блоки)
 
-const globalChk = document.getElementById('globalChk'); // чекбокс, см. index.html добавление
-// --- восстановление сохранённого глобального режима ---
+// === GLOBAL CHAT SWITCH ===
+const globalChk = document.getElementById("globalChk");
+
+// восстановление сохранённого состояния
 const savedGlobal = localStorage.getItem("globalChat") === "true";
 if (savedGlobal) {
     globalChk.checked = true;
 }
 
+// реагируем на включение/выключение глобалки
 globalChk.addEventListener("change", () => {
     const state = globalChk.checked;
     localStorage.setItem("globalChat", state ? "true" : "false");
 
-    // визуальная подсветка (опционально)
+    // визуальная подсветка (не обязательно)
     if (state) {
         globalChk.parentElement.style.color = "#4caf50";
     } else {
         globalChk.parentElement.style.color = "";
     }
 });
+
 
 // --- действие отправки сообщения (обновлённый sendMessage) ---
 async function sendMessage() {
@@ -299,5 +303,6 @@ socket.on('call-made', (data) => {
 
 // expose for debugging
 window.pc = pc;
+
 
 

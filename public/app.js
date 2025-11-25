@@ -1,5 +1,9 @@
 // public/app.js — phone-ID aware WebRTC + Chat (files/images) + typing + emoji
 const socket = io();
+socket.on('your-id', id => {
+    myId = id;
+    myIdEl.textContent = id;
+});
 
 // UI
 
@@ -153,7 +157,6 @@ function addMessageHTML({ from, text, type, time, url, name, size, mime }) {
 }
 
 // ----------------- socket handlers -----------------
-socket.on('your-id', id => { myId = id; myIdEl.textContent = id; });
 socket.on('chat-message', data => addMessageHTML(data));
 socket.on('typing', d => { typingEl.textContent = `${d.from} печатает...`; });
 socket.on('stop-typing', d => { typingEl.textContent = ''; });
@@ -318,6 +321,7 @@ socket.on('call-made', (data) => {
 
 // expose for debugging
 window.pc = pc;
+
 
 
 

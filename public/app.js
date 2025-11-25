@@ -2,6 +2,7 @@
 const socket = io();
 
 // UI
+
 const myIdEl = document.getElementById('myId');
 const messagesBox = document.getElementById('messages');
 const msgInput = document.getElementById('msgInput');
@@ -303,6 +304,7 @@ socket.on('call-made', (data) => {
 
 // expose for debugging
 window.pc = pc;
+
 
 
 

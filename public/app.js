@@ -38,6 +38,23 @@ socket.on("your-id", (id) => {
     yourIdEl.textContent = id;
 });
 
+sendMsgBtn.addEventListener("click", sendMessage);
+
+function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text) return;
+
+  socket.emit("chat-message", {
+    type: "text",
+    text,
+    time: Date.now()
+  });
+
+  addMessage("Вы", text);
+
+  msgInput.value = "";
+}
+
 // Показ сообщения
 function appendMessage(msg, self = false) {
     const div = document.createElement("div");
@@ -129,3 +146,4 @@ socket.on("typing", (d) => {
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
+

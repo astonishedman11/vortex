@@ -54,6 +54,18 @@ function sendMessage() {
 
   msgInput.value = "";
 }
+function addMessage(from, text, isMe = false) {
+    const box = document.createElement("div");
+    box.className = "msg";
+
+    box.innerHTML = `
+        <div class="msg-from">${from}</div>
+        <div class="msg-text">${text}</div>
+    `;
+
+    messages.appendChild(box);
+    messages.scrollTop = messages.scrollHeight;
+}
 
 // Показ сообщения
 function appendMessage(msg, self = false) {
@@ -146,4 +158,5 @@ socket.on("typing", (d) => {
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
+
 

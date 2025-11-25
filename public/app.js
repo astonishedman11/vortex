@@ -2,93 +2,72 @@ const socket = io();
 
 // DOM
 const yourIdEl = document.getElementById("yourId");
-const chatList = document.getElementById("chatList");
 const msgInput = document.getElementById("msgInput");
-const sendBtn = document.getElementById("sendBtn");
+const sendMsgBtn = document.getElementById("sendMsgBtn");
+const messages = document.getElementById("messages");
 const fileInput = document.getElementById("fileInput");
 const typingEl = document.getElementById("typing");
 const globalChk = document.getElementById("globalChk");
 
 let myId = null;
+let privateTarget = null; // сохраняем номер для личного чата
 
-// Загрузка состояния глобального чата
+// ---------------------------
+// Глобальный чат (load)
+// ---------------------------
 const globalState = localStorage.getItem("globalChat") === "true";
 globalChk.checked = globalState;
 
-// Подсветка
 if (globalState) {
     globalChk.parentElement.style.color = "#4caf50";
 }
 
-// Сохранение переключателя глобального чата
+// ---------------------------
+// Сохранение состояния глобального чата
+// ---------------------------
 globalChk.addEventListener("change", () => {
     const state = globalChk.checked;
     localStorage.setItem("globalChat", state ? "true" : "false");
 
-    if (state) {
-        globalChk.parentElement.style.color = "#4caf50";
-    } else {
-        globalChk.parentElement.style.color = "";
-    }
+    globalChk.parentElement.style.color = state ? "#4caf50" : "";
 });
 
-// Получение собственного номера
+// ---------------------------
+// Получение номера
+// ---------------------------
 socket.on("your-id", (id) => {
     myId = id;
     yourIdEl.textContent = id;
 });
 
-sendMsgBtn.addEventListener("click", sendMessage);
-
-function sendMessage() {
-  const text = msgInput.value.trim();
-  if (!text) return;
-
-  socket.emit("chat-message", {
-    type: "text",
-    text,
-    time: Date.now()
-  });
-
-  addMessage("Вы", text);
-
-  msgInput.value = "";
-}
-function addMessage(from, text, isMe = false) {
+// ---------------------------
+// Универсальная функция отображения сообщений
+// ---------------------------
+function appendMessage(msg, self = false) {
     const box = document.createElement("div");
-    box.className = "msg";
+    box.className = "msg" + (self ? " self" : "");
 
-    box.innerHTML = `
-        <div class="msg-from">${from}</div>
-        <div class="msg-text">${text}</div>
-    `;
+    let html = `<div class="msg-from">${msg.from}</div>`;
 
+    if (msg.type === "text") {
+        html += `<div class="msg-text">${msg.text}</div>`;
+    } else if (msg.type === "image") {
+        html += `<img src="${msg.url}" class="msg-img">`;
+    } else if (msg.type === "file") {
+        html += `<a href="${msg.url}" download>${msg.name}</a> (${Math.round(msg.size/1024)} KB)`;
+    }
+
+    box.innerHTML = html;
     messages.appendChild(box);
     messages.scrollTop = messages.scrollHeight;
 }
 
-// Показ сообщения
-function appendMessage(msg, self = false) {
-    const div = document.createElement("div");
-    div.className = "msg " + (self ? "self" : "");
+// ---------------------------
+// Отправка текста
+// ---------------------------
+sendMsgBtn.addEventListener("click", sendMessage);
 
-    let html = `<b>${msg.from || "???"}:</b> `;
-
-    if (msg.type === "text") {
-        html += msg.text;
-    } else if (msg.type === "image") {
-        html += `<img src="${msg.url}" class="msg-img">`;
-    } else if (msg.type === "file") {
-        html += `<a href="${msg.url}" download>${msg.name}</a> (${Math.round(msg.size / 1024)} KB)`;
-    }
-
-    div.innerHTML = html;
-    chatList.appendChild(div);
-    chatList.scrollTop = chatList.scrollHeight;
-}
-
-// Отправка сообщения
-sendBtn.addEventListener("click", () => {
+function sendMessage() {
     const text = msgInput.value.trim();
     if (!text) return;
 
@@ -98,16 +77,27 @@ sendBtn.addEventListener("click", () => {
         time: Date.now()
     };
 
-    // Глобальный или личный
-    if (!globalChk.checked) payload.to = prompt("Кому отправить? Введите номер:");
+    if (!globalChk.checked) {
+        if (!privateTarget) {
+            privateTarget = prompt("Введите номер собеседника:");
+        }
+        payload.to = privateTarget;
+    }
 
     socket.emit("chat-message", payload);
     appendMessage({ from: myId, ...payload }, true);
 
     msgInput.value = "";
-});
+}
 
-// Отправка файла
+// ---------------------------
+// Прием сообщений
+// ---------------------------
+socket.on("chat-message", (msg) => appendMessage(msg, false));
+
+// ---------------------------
+// Upload
+// ---------------------------
 fileInput.addEventListener("change", async () => {
     if (!fileInput.files.length) return;
 
@@ -115,13 +105,8 @@ fileInput.addEventListener("change", async () => {
     const fd = new FormData();
     fd.append("file", file);
 
-    const res = await fetch("/upload", {
-        method: "POST",
-        body: fd
-    });
-
+    const res = await fetch("/upload", { method: "POST", body: fd });
     const data = await res.json();
-    if (!data.url) return;
 
     const payload = {
         type: data.mime.startsWith("image/") ? "image" : "file",
@@ -130,33 +115,41 @@ fileInput.addEventListener("change", async () => {
         size: data.size
     };
 
-    if (!globalChk.checked) payload.to = prompt("Кому отправить? Введите номер:");
+    if (!globalChk.checked) {
+        if (!privateTarget) privateTarget = prompt("Введите номер:");
+        payload.to = privateTarget;
+    }
 
     socket.emit("chat-message", payload);
     appendMessage({ from: myId, ...payload }, true);
 });
 
-// Приём сообщений
-socket.on("chat-message", (msg) => {
-    appendMessage(msg, false);
-});
-
-// typing
+// ---------------------------
+// typing...
+// ---------------------------
 let typingTimer;
 
 msgInput.addEventListener("input", () => {
-    socket.emit("typing", globalChk.checked ? {} : { to: prompt("Номер:") });
+    if (globalChk.checked) {
+        socket.emit("typing", {});
+    } else {
+        if (!privateTarget) privateTarget = prompt("Введите номер собеседника:");
+        socket.emit("typing", { to: privateTarget });
+    }
+
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => {
-        socket.emit("stop-typing", globalChk.checked ? {} : { to: prompt("Номер:") });
+        if (globalChk.checked) {
+            socket.emit("stop-typing", {});
+        } else {
+            socket.emit("stop-typing", { to: privateTarget });
+        }
     }, 600);
 });
 
 socket.on("typing", (d) => {
-    typingEl.textContent = d.from + " печатает...";
+    typingEl.textContent = `${d.from} печатает...`;
 });
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
-
-

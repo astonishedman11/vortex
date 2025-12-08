@@ -8,7 +8,8 @@ const messages = document.getElementById("messages");
 const fileInput = document.getElementById("fileInput");
 const typingEl = document.getElementById("typing");
 const globalChk = document.getElementById("globalChk");
-const notifSound = document.getElementById("notifSound");
+const notifSound = new Audio("/ring_notif.mp3")
+notifSound.volume = 1.0
 
 
 let myId = null;
@@ -98,12 +99,15 @@ function sendMessage() {
 socket.on("chat-message", (msg) => {
     appendMessage(msg, false);
 
-    // 🔊 звук входящего сообщения
-    if (notifSound) {
+    // ✅ звук только если сообщение не от тебя
+    if (msg.from !== myId) {
         notifSound.currentTime = 0;
-        notifSound.play().catch(() => {});
+        notifSound.play().catch(err => {
+            console.log("⚠️ Браузер заблокировал звук:", err);
+        });
     }
 });
+
 
 
 // ---------------------------
@@ -164,6 +168,7 @@ socket.on("typing", (d) => {
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
+
 
 
 

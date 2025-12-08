@@ -169,6 +169,15 @@ socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
 
+document.body.addEventListener("click", () => {
+    notifSound.play().then(() => {
+        notifSound.pause();
+        notifSound.currentTime = 0;
+        console.log("✅ Звук разблокирован");
+    }).catch(()=>{});
+}, { once: true });
+
+
 
 
 

@@ -96,12 +96,15 @@ function sendMessage() {
 // Прием сообщений
 // ---------------------------
 socket.on("chat-message", (msg) => {
-    appendMessage(msg, false)
+    appendMessage(msg, false);
+
+    // 🔊 звук входящего сообщения
     if (notifSound) {
-    notifSound.currentTime = 0;
-    notifSound.play().catch(() => {});;
+        notifSound.currentTime = 0;
+        notifSound.play().catch(() => {});
     }
 });
+
 
 // ---------------------------
 // Upload
@@ -161,5 +164,6 @@ socket.on("typing", (d) => {
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
+
 
 

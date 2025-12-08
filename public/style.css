@@ -23,3 +23,29 @@ video{width:100%;height:260px;background:#000;border-radius:10px;object-fit:cove
 .emoji{padding:6px;border-radius:6px;border:none;background:#fff;cursor:pointer}
 .typing{font-size:13px;color:#2b7a6b;height:18px}
 .uploads-preview{margin-top:12px;font-size:13px;color:#6b7b78}
+.msg {
+  animation: msgIn 0.25s ease-out;
+  background: #1e1e1e;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: white;
+  max-width: 80%;
+}
+
+.msg.self {
+  background: #4caf50;
+  margin-left: auto;
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+

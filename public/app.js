@@ -8,6 +8,8 @@ const messages = document.getElementById("messages");
 const fileInput = document.getElementById("fileInput");
 const typingEl = document.getElementById("typing");
 const globalChk = document.getElementById("globalChk");
+const notifSound = document.getElementById("notifSound");
+
 
 let myId = null;
 let privateTarget = null; // сохраняем номер для личного чата
@@ -153,3 +155,4 @@ socket.on("typing", (d) => {
 socket.on("stop-typing", () => {
     typingEl.textContent = "";
 });
+
